@@ -129,6 +129,7 @@ st.markdown("""
     .badge-database { background: rgba(56, 189, 248, 0.18); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.4); }
     .badge-network { background: rgba(96, 165, 250, 0.18); color: #60A5FA; border: 1px solid rgba(96, 165, 250, 0.4); }
     .badge-api { background: rgba(244, 114, 182, 0.18); color: #F472B6; border: 1px solid rgba(244, 114, 182, 0.4); }
+    .badge-unable { background: rgba(148, 163, 184, 0.18); color: #CBD5E1; border: 1px solid rgba(148, 163, 184, 0.4); }
     
     .cat-pill {
         display: inline-block;
@@ -237,12 +238,13 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("🎯 Sensitivity Settings")
     conf_threshold = st.slider(
-        "Uncertainty Alert Threshold",
+        "Confidence Threshold",
         min_value=0.40,
-        max_value=0.90,
-        value=0.60,
+        max_value=0.95,
+        value=0.70,
         step=0.05,
-        help="Flag prediction as 'Uncertain' if confidence falls below this value."
+        format="%.0f%%",
+        help="Predictions below this confidence threshold will display 'Unable to Predict' and be marked as Unreliable."
     )
     
     st.markdown("---")
@@ -312,39 +314,47 @@ with tab_analyzer:
     analyze_btn = st.button("🚀 Analyze Error Trace", type="primary", width="stretch")
 
     if analyze_btn or selected_preset:
-        if not error_input.strip():
-            st.warning("Please enter or select an error message to analyze.")
+        clean_input = error_input.strip()
+        if not clean_input:
+            st.warning("Please enter a valid error message.")
         else:
             with st.spinner("Analyzing traceback with neural pipeline..."):
                 analyzer = get_analyzer(selected_model_file)
-                res = analyzer.analyze(error_input)
+                res = analyzer.analyze(clean_input, conf_threshold=conf_threshold)
             
             if "error" in res:
-                st.error(res["error"])
+                st.warning(f"⚠️ {res['error']}")
             else:
-                # Update confidence threshold on the fly
-                res["uncertain"] = res["confidence"] < conf_threshold
+                is_uncertain = res["uncertain"]
                 
                 st.markdown("---")
                 st.markdown("### 📊 Diagnostic Results")
                 
+                # Prominent alert if confidence is below threshold
+                if is_uncertain:
+                    st.warning("⚠️ **Unable to Predict — Please provide a more detailed error log.**")
+                
                 # Metrics Row
                 m_col1, m_col2, m_col3, m_col4 = st.columns(4)
                 
-                err_type = res["error_type"]
-                badge_class = f"badge-{err_type.lower()}"
+                if is_uncertain:
+                    display_cat = "Unable to Predict"
+                    badge_class = "badge-unable"
+                else:
+                    display_cat = res["error_type"]
+                    badge_class = f"badge-{display_cat.lower()}"
                 
                 with m_col1:
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">Predicted Category</div>
-                        <div class="metric-value"><span class="cat-pill {badge_class}">{err_type}</span></div>
+                        <div class="metric-value"><span class="cat-pill {badge_class}">{display_cat}</span></div>
                     </div>
                     """, unsafe_allow_html=True)
                     
                 with m_col2:
                     conf_pct = res['confidence'] * 100
-                    conf_color = "#34D399" if conf_pct > 80 else ("#FBBF24" if conf_pct > 60 else "#F87171")
+                    conf_color = "#34D399" if conf_pct >= conf_threshold * 100 else ("#FBBF24" if conf_pct >= 50 else "#F87171")
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">Prediction Confidence</div>
@@ -353,7 +363,7 @@ with tab_analyzer:
                     """, unsafe_allow_html=True)
                     
                 with m_col3:
-                    match_status = "Direct Rule Match" if res["kb_match"] else "Category Default"
+                    match_status = "Direct Rule Match" if res["kb_match"] else "No Rule Match"
                     match_color = "#818CF8" if res["kb_match"] else "#94A3B8"
                     st.markdown(f"""
                     <div class="metric-card">
@@ -363,8 +373,8 @@ with tab_analyzer:
                     """, unsafe_allow_html=True)
                     
                 with m_col4:
-                    status_text = "Uncertain" if res["uncertain"] else "High Certainty"
-                    status_clr = "#F87171" if res["uncertain"] else "#34D399"
+                    status_text = f"Reliable (≥ {conf_threshold:.0%})" if not is_uncertain else f"Unreliable (< {conf_threshold:.0%})"
+                    status_clr = "#34D399" if not is_uncertain else "#F87171"
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">Reliability Assessment</div>
@@ -372,8 +382,10 @@ with tab_analyzer:
                     </div>
                     """, unsafe_allow_html=True)
 
-                if res["uncertain"]:
-                    st.warning(f"⚠️ Low confidence (< {conf_threshold:.0%}). The error message deviates significantly from training distributions. Verify carefully.")
+                # Separate model debugging display when prediction is unreliable
+                if is_uncertain:
+                    with st.expander("🛠️ Debugging: Model Raw Prediction (Unreliable)", expanded=False):
+                        st.info(f"**Raw Model Prediction**: `{res['raw_error_type']}`  \n**Model Confidence**: `{res['confidence']:.1%}` (Required threshold: `{conf_threshold:.0%}`)  \n*Note: This raw prediction was suppressed from the final diagnosis because confidence is below the {conf_threshold:.0%} threshold.*")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 

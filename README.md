@@ -62,6 +62,7 @@ error_classifier_progress/
 ├── dataset.py            # Synthetic & Real Error Dataset Generator (7 Classes)
 ├── knowledge_base.py     # Regex Pattern Knowledge Base for Causes & Remediation
 ├── predict.py            # CLI Inference & ErrorAnalyzer class
+├── test_analyzer.py      # Automated Test Suite (Uncertainty, Thresholds, KB Fallback)
 ├── train.py              # Training script for CNN, LSTM & Bi-LSTM models
 ├── requirements.txt      # Python Dependencies
 ├── README.md             # Project Documentation
@@ -101,12 +102,23 @@ python dataset.py
 python train.py --epochs 20 --per-class 1200
 ```
 
-### 4. CLI Inference
+### 4. Run Test Suite
+```bash
+python test_analyzer.py
+```
+Validates:
+- All 7 error categories on real and synthetic tracebacks.
+- Confidence thresholding & "Unable to Predict" suppression.
+- Input validation (empty, whitespace, non-meaningful inputs).
+- Knowledge base direct matches and "No specific fix found" fallback.
+- Support across all three architectures: CNN, LSTM, and Bi-LSTM.
+
+### 5. CLI Inference
 ```bash
 python predict.py "psycopg2.OperationalError: could not connect to server: Connection refused"
 ```
 
-### 5. Launch Web Application
+### 6. Launch Web Application
 ```bash
 python -m streamlit run app.py
 ```

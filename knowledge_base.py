@@ -33,16 +33,16 @@ RULES = [
     (r"SSL: CERTIFICATE_VERIFY_FAILED|ERR_CERT_AUTHORITY_INVALID|SSLError",
      "SSL/TLS certificate verification failed.",
      "Install valid SSL certificates or configure custom CA bundles (avoid setting verify=False in production)."),
-    (r"getaddrinfo failed|ENOTFOUND|UnknownHostException|ERR_NAME_NOT_RESOLVED",
+    (r"getaddrinfo failed|\bENOTFOUND\b|UnknownHostException|ERR_NAME_NOT_RESOLVED",
      "DNS resolution failed. Domain hostname could not be resolved.",
      "Check internet connection, verify URL hostname spelling, and check DNS configuration."),
-    (r"HTTPSConnectionPool|HTTPConnectionPool.*Max retries exceeded|net::ERR_CONNECTION_TIMED_OUT|Connection timed out|ETIMEDOUT|SocketTimeoutException",
+    (r"HTTPSConnectionPool|HTTPConnectionPool.*Max retries exceeded|net::ERR_CONNECTION_TIMED_OUT|Connection timed out|\bETIMEDOUT\b|SocketTimeoutException",
      "Network request timed out waiting for server response.",
      "Verify target server status, network latency, proxy settings, and check request timeout configuration."),
-    (r"connect ECONNREFUSED|Connection refused|ERR_CONNECTION_REFUSED",
+    (r"connect ECONNREFUSED|\bECONNREFUSED\b|Connection refused|ERR_CONNECTION_REFUSED",
      "Network connection was refused by target server (port not listening or server down).",
      "Check that the server process is running on the expected IP and port, and check firewall rules."),
-    (r"Connection reset by peer|ECONNRESET",
+    (r"Connection reset by peer|\bECONNRESET\b",
      "Connection was forcibly closed by the remote server.",
      "Check remote server health, proxy keep-alive settings, or request payload limits."),
 
@@ -91,7 +91,7 @@ RULES = [
     (r"Could not find a version|No matching distribution",
      "pip cannot find a compatible version of the package.",
      "Check the package name, your Python version and internet/index settings."),
-    (r"npm ERR!|Could not resolve dependency|peer dep|ERESOLVE",
+    (r"npm ERR!|Could not resolve dependency|\bpeer dep\b|\bERESOLVE\b",
      "npm dependency resolution failed (missing or conflicting versions).",
      "Check package names/versions; try: npm install --legacy-peer-deps"),
     (r"DLL load failed|cannot open shared object file|UnsatisfiedLinkError",
@@ -194,13 +194,20 @@ DEFAULTS = {
 }
 
 
-def lookup(text, label):
-    """Return (cause, fix, matched_rule_bool)."""
+NO_FIX_MESSAGE = "No specific fix found"
+NO_CAUSE_MESSAGE = "No specific root cause identified in knowledge base."
+
+
+def lookup(text, label=None):
+    """Return (cause, fix, matched_rule_bool).
+
+    If no specific rule matches, returns ('No specific root cause identified in knowledge base.', 'No specific fix found', False)
+    instead of giving a misleading root cause or generic fix.
+    """
     for pat, cause, fix in RULES:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             groups = [g for g in m.groups() if g] or [""]
             return cause.replace("{1}", groups[0]), fix.replace("{1}", groups[0]), True
-    c, f = DEFAULTS.get(label, ("Unknown.", "Check the full error output."))
-    return c, f, False
+    return NO_CAUSE_MESSAGE, NO_FIX_MESSAGE, False
 

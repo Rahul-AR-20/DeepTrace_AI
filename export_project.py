@@ -12,6 +12,7 @@ files_to_zip = [
     "knowledge_base.py",
     "predict.py",
     "train.py",
+    "test_analyzer.py",
     "requirements.txt",
     "README.md",
 ]
