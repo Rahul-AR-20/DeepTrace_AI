@@ -1,0 +1,8 @@
+tensorflow>=2.16
+gensim>=4.3
+scikit-learn
+pandas
+numpy
+matplotlib
+nltk
+streamlit
